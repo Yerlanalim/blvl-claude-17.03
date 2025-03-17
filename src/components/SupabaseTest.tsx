@@ -4,39 +4,39 @@ import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
 
 export default function SupabaseTest() {
-  const [status, setStatus] = useState<string>('Checking connection...');
+  const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<any>(null);
   const supabase = createClient();
 
   useEffect(() => {
-    async function checkConnection() {
+    async function testConnection() {
       try {
-        // Test database connection with a simple query
-        const { data, error } = await supabase.from('users').select('*').limit(1);
-
+        const { data, error } = await supabase.from('test').select('*').limit(1);
+        
         if (error) {
           if (error.code === 'PGRST116') {
-            setStatus('Database connected but table "users" does not exist');
+            setError('Database connected but table "test" does not exist');
           } else {
-            setStatus(`Database Error: ${error.message}`);
+            setError(error.message);
           }
-          console.error('Database error:', error);
+          setIsConnected(false);
           return;
         }
 
-        setStatus('Database connection successful!');
-        console.log('Database response:', data);
+        setIsConnected(true);
+        setError(null);
 
         // Check authentication status
         const { data: sessionData } = await supabase.auth.getSession();
         setSession(sessionData.session);
-      } catch (error) {
-        setStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        console.error('Connection error:', error);
+      } catch (err: any) {
+        setIsConnected(false);
+        setError(err.message);
       }
     }
 
-    checkConnection();
+    testConnection();
 
     // Set up auth state listener
     const {
@@ -46,7 +46,7 @@ export default function SupabaseTest() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase]);
 
   const handleGithubLogin = async () => {
     try {
@@ -59,11 +59,11 @@ export default function SupabaseTest() {
 
       if (error) {
         console.error('Auth error:', error);
-        setStatus(`Auth Error: ${error.message}`);
+        setError(`Auth Error: ${error.message}`);
       }
     } catch (error) {
       console.error('Login error:', error);
-      setStatus(`Login Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setError(`Login Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -74,9 +74,16 @@ export default function SupabaseTest() {
       <div className="space-y-4">
         <div>
           <h3 className="font-semibold">Connection Status:</h3>
-          <p className={`mt-1 ${status.includes('Error') ? 'text-red-500' : 'text-green-500'}`}>
-            {status}
-          </p>
+          {isConnected === null ? (
+            <p>Testing connection...</p>
+          ) : isConnected ? (
+            <p className="text-green-600">✅ Connected to Supabase</p>
+          ) : (
+            <div>
+              <p className="text-red-600">❌ Failed to connect to Supabase</p>
+              {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+            </div>
+          )}
         </div>
 
         <div>
@@ -86,12 +93,14 @@ export default function SupabaseTest() {
           </p>
         </div>
 
-        <button
-          onClick={handleGithubLogin}
-          className="rounded bg-blue-500 px-4 py-2 text-white transition hover:bg-blue-600"
-        >
-          Sign In with GitHub
-        </button>
+        {!session && (
+          <button
+            onClick={handleGithubLogin}
+            className="rounded bg-blue-500 px-4 py-2 text-white transition hover:bg-blue-600"
+          >
+            Sign In with GitHub
+          </button>
+        )}
       </div>
 
       {/* Debug Info */}

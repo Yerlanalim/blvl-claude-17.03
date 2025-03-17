@@ -24,61 +24,31 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`transition-width fixed top-0 left-0 z-40 h-screen border-r border-gray-200 bg-white duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'} `}
+      id="default-sidebar"
+      className="fixed left-0 top-0 z-40 h-screen w-64 -translate-x-full transition-transform sm:translate-x-0"
+      aria-label="Sidebar"
     >
-      <div className="h-full overflow-y-auto px-3 py-4">
-        {/* Logo */}
-        <Link href="/" className="mb-5 flex items-center pl-2.5">
-          <span
-            className={`self-center text-xl font-semibold whitespace-nowrap ${isCollapsed ? 'hidden' : 'block'} `}
-          >
+      <div className="h-full overflow-y-auto bg-gray-50 px-3 py-4 dark:bg-gray-800">
+        <Link
+          href="/"
+          className="mb-5 flex items-center ps-2.5"
+        >
+          <span className="whitespace-nowrap text-xl font-semibold dark:text-white">
             BizLevel
           </span>
         </Link>
-
-        {/* User Profile */}
-        <div className="mb-6 flex items-center gap-4 pl-2.5">
-          <div className="relative h-10 w-10 overflow-hidden rounded-full">
-            <Image src="/placeholder-avatar.png" alt="User avatar" fill className="object-cover" />
-          </div>
-          {!isCollapsed && (
-            <div>
-              <h3 className="text-sm font-medium">John Doe</h3>
-              <p className="text-xs text-gray-500">Level 5</p>
-            </div>
-          )}
-        </div>
-
-        {/* Navigation */}
-        <nav className="space-y-2">
+        <ul className="space-y-2 font-medium">
           {navigation.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="group flex items-center rounded-lg p-2 text-gray-900 hover:bg-gray-100"
-            >
-              <span className="h-6 w-6 text-center">{item.icon}</span>
-              {!isCollapsed && <span className="ml-3">{item.label}</span>}
-            </Link>
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                className="flex items-center rounded-lg p-2 text-gray-900 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
+              >
+                <span>{item.label}</span>
+              </Link>
+            </li>
           ))}
-        </nav>
-
-        {/* Collapse Button */}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="fixed bottom-4 left-4 p-2 text-gray-500 hover:text-gray-900"
-        >
-          {isCollapsed ? '→' : '←'}
-        </button>
-
-        {/* Logout Button */}
-        <button
-          onClick={() => console.log('Logout clicked')}
-          className="fixed bottom-16 left-4 flex items-center rounded-lg p-2 text-gray-900 hover:bg-gray-100"
-        >
-          <span className="h-6 w-6 text-center">🚪</span>
-          {!isCollapsed && <span className="ml-3">Logout</span>}
-        </button>
+        </ul>
       </div>
     </aside>
   );
