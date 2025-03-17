@@ -2,17 +2,18 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
+import { Session } from '@supabase/supabase-js';
 
 export default function SupabaseTest() {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
     async function testConnection() {
       try {
-        const { data, error } = await supabase.from('test').select('*').limit(1);
+        const { error } = await supabase.from('test').select('*').limit(1);
         
         if (error) {
           if (error.code === 'PGRST116') {
@@ -30,9 +31,9 @@ export default function SupabaseTest() {
         // Check authentication status
         const { data: sessionData } = await supabase.auth.getSession();
         setSession(sessionData.session);
-      } catch (err: any) {
+      } catch (error) {
         setIsConnected(false);
-        setError(err.message);
+        setError(error instanceof Error ? error.message : 'Unknown error');
       }
     }
 
