@@ -54,7 +54,25 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
+
+  // Check auth condition
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    if (!session) {
+      // Redirect to login if accessing dashboard without session
+      const redirectUrl = new URL('/auth/signin', request.url);
+      redirectUrl.searchParams.set('redirectedFrom', request.nextUrl.pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
+
+  // If accessing auth pages while logged in, redirect to dashboard
+  if (request.nextUrl.pathname.startsWith('/auth') && session) {
+    if (request.nextUrl.pathname === '/auth/update-password') {
+      return response;
+    }
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
 
   return response;
 }
@@ -68,7 +86,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - api routes
      */
-    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public/|api/).*)',
   ],
 };

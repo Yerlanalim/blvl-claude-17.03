@@ -13,14 +13,11 @@ export default function SupabaseTest() {
   useEffect(() => {
     async function testConnection() {
       try {
-        const { error } = await supabase.from('test').select('*').limit(1);
+        // Instead of querying a non-existent table, just test the connection
+        const { data, error } = await supabase.from('users').select('count()', { count: 'exact' });
         
         if (error) {
-          if (error.code === 'PGRST116') {
-            setError('Database connected but table "test" does not exist');
-          } else {
-            setError(error.message);
-          }
+          setError(error.message);
           setIsConnected(false);
           return;
         }
@@ -49,22 +46,12 @@ export default function SupabaseTest() {
     return () => subscription.unsubscribe();
   }, [supabase]);
 
-  const handleGithubLogin = async () => {
+  const handleSignOut = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) {
-        console.error('Auth error:', error);
-        setError(`Auth Error: ${error.message}`);
-      }
+      await supabase.auth.signOut();
     } catch (error) {
-      console.error('Login error:', error);
-      setError(`Login Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Logout error:', error);
+      setError(`Logout Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -94,12 +81,12 @@ export default function SupabaseTest() {
           </p>
         </div>
 
-        {!session && (
+        {session && (
           <button
-            onClick={handleGithubLogin}
-            className="rounded bg-blue-500 px-4 py-2 text-white transition hover:bg-blue-600"
+            onClick={handleSignOut}
+            className="rounded bg-red-500 px-4 py-2 text-white transition hover:bg-red-600"
           >
-            Sign In with GitHub
+            Sign Out
           </button>
         )}
       </div>
