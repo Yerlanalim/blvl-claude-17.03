@@ -20,14 +20,26 @@ export default function AvatarUploadSection({ user }: { user: User }) {
   useEffect(() => {
     const fetchAvatar = async () => {
       try {
-        // Fetch user profile
-        const { data, error } = await supabase
-          .from('users')
+        // Try first with user_profile view
+        let { data, error } = await supabase
+          .from('user_profile')
           .select('avatar_url')
           .eq('id', user.id)
           .single();
-
-        if (error) throw error;
+          
+        // If that fails, try with the users table
+        if (error) {
+          console.log('Falling back to users table:', error.message);
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('avatar_url')
+            .eq('id', user.id)
+            .single();
+            
+          if (!userError && userData) {
+            data = userData;
+          }
+        }
 
         const avatarUrl = data?.avatar_url || user.user_metadata?.avatar_url;
         setAvatarUrl(avatarUrl);
@@ -72,19 +84,25 @@ export default function AvatarUploadSection({ user }: { user: User }) {
 
     const file = fileInput.files[0];
     const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-    const filePath = `avatars/${fileName}`;
+    const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+    // Create a path with user ID as the folder name to match RLS policies
+    const filePath = `${user.id}/${fileName}`;
 
     setUploading(true);
     setMessage(null);
 
     try {
+      console.log('Uploading avatar to path:', filePath);
+      
       // Upload file to Supabase Storage
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError, data } = await supabase.storage
         .from('avatars')
         .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
 
       // Get the public URL
       const { data: publicUrlData } = supabase.storage
@@ -92,27 +110,42 @@ export default function AvatarUploadSection({ user }: { user: User }) {
         .getPublicUrl(filePath);
 
       const avatarUrl = publicUrlData.publicUrl;
+      console.log('Avatar URL:', avatarUrl);
 
-      // Update user_metadata in auth.users
-      const { error: authError } = await supabase.auth.updateUser({
-        data: { avatar_url: avatarUrl },
-      });
+      // Try to update both auth user metadata and profile in database
+      try {
+        // Update user_metadata in auth.users
+        const { error: authError } = await supabase.auth.updateUser({
+          data: { avatar_url: avatarUrl },
+        });
 
-      if (authError) throw authError;
+        if (authError) {
+          console.error('Auth update error:', authError);
+          throw authError;
+        }
+      } catch (authError) {
+        console.warn('Could not update auth user:', authError);
+      }
 
-      // Update profile in users table
-      const { error: profileError } = await supabase
-        .from('users')
-        .upsert(
-          {
-            id: user.id,
-            avatar_url: avatarUrl,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'id' }
-        );
+      try {
+        // Update profile in users table
+        const { error: profileError } = await supabase
+          .from('users')
+          .upsert(
+            {
+              id: user.id,
+              avatar_url: avatarUrl,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'id' }
+          );
 
-      if (profileError) throw profileError;
+        if (profileError) {
+          console.warn('Could not update users table:', profileError);
+        }
+      } catch (profileError) {
+        console.warn('Error updating profile in database:', profileError);
+      }
 
       setAvatarUrl(avatarUrl);
       setPreview(null);
@@ -144,32 +177,50 @@ export default function AvatarUploadSection({ user }: { user: User }) {
     try {
       // Try to get the file path from the URL
       const urlParts = avatarUrl.split('/');
-      const bucket = urlParts[urlParts.length - 2];
-      const filePath = urlParts[urlParts.length - 1];
+      const fileName = urlParts[urlParts.length - 1];
+      const userId = user.id;
+      const filePath = `${userId}/${fileName}`;
 
-      // Only attempt to delete if it's in our storage
-      if (bucket === 'avatars') {
-        // This may fail if the file doesn't exist, but we don't need to handle that
+      console.log('Removing avatar at path:', filePath);
+
+      // Attempt to remove the file from storage
+      try {
         await supabase.storage.from('avatars').remove([filePath]);
+      } catch (storageError) {
+        console.warn('Could not remove file from storage:', storageError);
+        // Continue even if storage removal fails
       }
 
       // Update user_metadata in auth.users
-      const { error: authError } = await supabase.auth.updateUser({
-        data: { avatar_url: null },
-      });
+      try {
+        const { error: authError } = await supabase.auth.updateUser({
+          data: { avatar_url: null },
+        });
 
-      if (authError) throw authError;
+        if (authError) {
+          console.error('Auth update error:', authError);
+          throw authError;
+        }
+      } catch (authError) {
+        console.warn('Could not update auth user:', authError);
+      }
 
       // Update profile in users table
-      const { error: profileError } = await supabase
-        .from('users')
-        .update({
-          avatar_url: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
+      try {
+        const { error: profileError } = await supabase
+          .from('users')
+          .update({
+            avatar_url: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user.id);
 
-      if (profileError) throw profileError;
+        if (profileError) {
+          console.warn('Could not update users table:', profileError);
+        }
+      } catch (profileError) {
+        console.warn('Error updating profile in database:', profileError);
+      }
 
       setAvatarUrl(null);
       setPreview(null);

@@ -22,13 +22,26 @@ export default function ProfileSettingsSection({ user }: { user: User }) {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const { data, error } = await supabase
-          .from('users')
+        // Try first with user_profile view
+        let { data, error } = await supabase
+          .from('user_profile')
           .select('name')
           .eq('id', user.id)
           .single();
-
-        if (error) throw error;
+          
+        // If that fails, try with the users table
+        if (error) {
+          console.log('Falling back to users table:', error.message);
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('full_name')
+            .eq('id', user.id)
+            .single();
+            
+          if (!userError && userData) {
+            data = { name: userData.full_name };
+          }
+        }
 
         // Set initial values
         setName(data?.name || user.user_metadata?.full_name || user.user_metadata?.name || '');
@@ -48,24 +61,27 @@ export default function ProfileSettingsSection({ user }: { user: User }) {
     try {
       // Update user_metadata in auth.users
       const { error: authError } = await supabase.auth.updateUser({
-        data: { name },
+        data: { name, full_name: name },
       });
 
       if (authError) throw authError;
 
-      // Update profile in users table
+      // Try to update profile in users table with both name and full_name fields
+      // to ensure compatibility with both database schemas
       const { error: profileError } = await supabase
         .from('users')
         .upsert(
           {
             id: user.id,
-            name,
+            full_name: name,
             updated_at: new Date().toISOString(),
           },
           { onConflict: 'id' }
         );
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.warn('Could not update users table:', profileError.message);
+      }
 
       setMessage({
         type: 'success',
@@ -251,7 +267,7 @@ export default function ProfileSettingsSection({ user }: { user: User }) {
                 required
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
               />
             </div>
           </div>
@@ -271,7 +287,7 @@ export default function ProfileSettingsSection({ user }: { user: User }) {
                 required
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
               />
             </div>
           </div>
@@ -291,7 +307,7 @@ export default function ProfileSettingsSection({ user }: { user: User }) {
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
               />
             </div>
           </div>

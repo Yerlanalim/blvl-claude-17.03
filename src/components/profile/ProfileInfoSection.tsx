@@ -32,24 +32,39 @@ export default function ProfileInfoSection({ user }: { user: User }) {
         setLoading(true);
         setError(null);
 
-        // Fetch user profile from the "users" table
-        const { data, error } = await supabase
-          .from('users')
+        // Try first with user_profile view
+        let { data, error } = await supabase
+          .from('user_profile')
           .select('*')
           .eq('id', user.id)
           .single();
 
-        if (error) throw error;
+        // If that fails, fallback to users table directly
+        if (error) {
+          console.log('Falling back to users table:', error.message);
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          
+          if (userError) throw userError;
+          
+          data = userData;
+        }
+
+        if (!data) throw new Error('No profile data found');
 
         setProfileData({
           id: user.id,
           email: user.email,
-          name: data?.name || user.user_metadata?.full_name || user.user_metadata?.name || null,
-          avatar_url: data?.avatar_url || user.user_metadata?.avatar_url || null,
-          level: data?.level || 1,
-          xp: data?.xp || 0,
-          coins: data?.coins || 0,
-          created_at: data?.created_at || user.created_at,
+          // Handle both name and full_name fields
+          name: data.name || data.full_name || user.user_metadata?.full_name || user.user_metadata?.name || null,
+          avatar_url: data.avatar_url || user.user_metadata?.avatar_url || null,
+          level: data.level || 1,
+          xp: data.xp || 0,
+          coins: data.coins || 0,
+          created_at: data.created_at || user.created_at,
         });
       } catch (error) {
         console.error('Error fetching profile data:', error);

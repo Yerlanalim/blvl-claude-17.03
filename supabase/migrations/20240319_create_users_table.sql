@@ -1,47 +1,60 @@
--- Create a users table with RLS policies
+-- This migration creates the users table with all necessary fields
+-- It will serve as our main table for storing user profile information
+
 CREATE TABLE IF NOT EXISTS public.users (
-  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  email TEXT,
-  name TEXT,
+  -- Primary key, matching the auth.users id
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  
+  -- Basic info
+  email TEXT NOT NULL,
+  full_name TEXT,
   avatar_url TEXT,
-  level INTEGER DEFAULT 1,
-  xp INTEGER DEFAULT 0,
-  coins INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ
+  
+  -- Game mechanics
+  level INTEGER NOT NULL DEFAULT 1,
+  xp INTEGER NOT NULL DEFAULT 0,
+  coins INTEGER NOT NULL DEFAULT 0,
+  
+  -- Timestamps
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Set up Row Level Security (RLS)
+-- Add comment to the table
+COMMENT ON TABLE public.users IS 'Profile information for authenticated users';
+
+-- Add indices for faster queries
+CREATE INDEX IF NOT EXISTS users_email_idx ON public.users (email);
+
+-- Enable Row Level Security
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
--- Create a policy to allow reading any user profile
-CREATE POLICY "Allow anyone to read users" ON public.users
+-- Create policy for users to view all profiles but only edit their own
+CREATE POLICY "Users can view all profiles"
+  ON public.users
   FOR SELECT
   USING (true);
 
--- Create a policy that allows users to update only their own profiles
-CREATE POLICY "Allow users to update own profile" ON public.users
+CREATE POLICY "Users can update their own profile"
+  ON public.users
   FOR UPDATE
-  USING (auth.uid() = id)
-  WITH CHECK (auth.uid() = id);
+  USING (auth.uid() = id);
 
--- Create a policy that only allows inserting your own data
-CREATE POLICY "Allow users to insert own data" ON public.users
+CREATE POLICY "Users can insert their own profile"
+  ON public.users
   FOR INSERT
   WITH CHECK (auth.uid() = id);
 
--- Create a trigger function to handle user creation
-CREATE OR REPLACE FUNCTION public.handle_new_user()
+-- Create a trigger to update the updated_at timestamp
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.users (id, email, created_at)
-  VALUES (new.id, new.email, now());
-  RETURN new;
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
--- Create a trigger to auto-create a user profile after signup
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user(); 
+CREATE TRIGGER users_updated_at
+BEFORE UPDATE ON public.users
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_updated_at(); 
