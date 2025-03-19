@@ -28,6 +28,38 @@ export type UserProfileView = {
   updated_at: string | null;
 };
 
+// Level and progression types
+export type Level = Database['public']['Tables']['levels']['Row'];
+export type LevelPrerequisite = Database['public']['Tables']['level_prerequisites']['Row'];
+export type Progress = Database['public']['Tables']['progress']['Row'];
+
+// Progress status enum
+export enum ProgressStatus {
+  NOT_STARTED = 'not_started',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed'
+}
+
+// User level status from the view
+export type UserLevelStatus = Database['public']['Views']['user_level_status']['Row'];
+
+// Extended level type with additional frontend properties
+export type LevelWithStatus = UserLevelStatus & {
+  statusLabel: string;
+  statusColor: string;
+  statusIcon: string;
+};
+
+// Response type for level completion
+export type LevelCompletionResponse = {
+  success: boolean;
+  message: string;
+  rewards?: {
+    xp: number;
+    coins: number;
+  };
+};
+
 // Database table types for ease of use
 export type Tables = Database['public']['Tables'];
 export type TableRow<T extends keyof Tables> = Tables[T]['Row'];

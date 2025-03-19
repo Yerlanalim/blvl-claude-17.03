@@ -38,36 +38,71 @@ export interface Database {
           coins?: number;
         };
       };
-      courses: {
+      levels: {
         Row: {
           id: string;
           created_at: string;
+          updated_at: string;
           title: string;
           description: string;
-          level: number;
+          order_index: number;
+          thumbnail_url: string | null;
           xp_reward: number;
           coin_reward: number;
-          content: Json;
+          required_level: number;
+          is_active: boolean;
+          content: Json | null;
+          metadata: Json | null;
         };
         Insert: {
-          id: string;
+          id?: string;
           created_at?: string;
+          updated_at?: string;
           title: string;
           description: string;
-          level?: number;
+          order_index: number;
+          thumbnail_url?: string | null;
           xp_reward?: number;
           coin_reward?: number;
-          content?: Json;
+          required_level?: number;
+          is_active?: boolean;
+          content?: Json | null;
+          metadata?: Json | null;
         };
         Update: {
           id?: string;
           created_at?: string;
+          updated_at?: string;
           title?: string;
           description?: string;
-          level?: number;
+          order_index?: number;
+          thumbnail_url?: string | null;
           xp_reward?: number;
           coin_reward?: number;
-          content?: Json;
+          required_level?: number;
+          is_active?: boolean;
+          content?: Json | null;
+          metadata?: Json | null;
+        };
+      };
+      level_prerequisites: {
+        Row: {
+          id: string;
+          created_at: string;
+          level_id: string;
+          prerequisite_id: string;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          level_id: string;
+          prerequisite_id: string;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          level_id?: string;
+          prerequisite_id?: string;
         };
       };
       progress: {
@@ -75,17 +110,19 @@ export interface Database {
           id: string;
           created_at: string;
           user_id: string;
-          course_id: string;
+          level_id: string;
           completed: boolean;
+          status: string;
           score: number;
           last_accessed: string;
         };
         Insert: {
-          id: string;
+          id?: string;
           created_at?: string;
           user_id: string;
-          course_id: string;
+          level_id: string;
           completed?: boolean;
+          status?: string;
           score?: number;
           last_accessed?: string;
         };
@@ -93,8 +130,9 @@ export interface Database {
           id?: string;
           created_at?: string;
           user_id?: string;
-          course_id?: string;
+          level_id?: string;
           completed?: boolean;
+          status?: string;
           score?: number;
           last_accessed?: string;
         };
@@ -110,7 +148,7 @@ export interface Database {
           icon_url: string;
         };
         Insert: {
-          id: string;
+          id?: string;
           created_at?: string;
           title: string;
           description: string;
@@ -137,7 +175,7 @@ export interface Database {
           unlocked_at: string;
         };
         Insert: {
-          id: string;
+          id?: string;
           created_at?: string;
           user_id: string;
           achievement_id: string;
@@ -168,8 +206,59 @@ export interface Database {
         Insert: never;
         Update: never;
       };
+      user_level_status: {
+        Row: {
+          level_id: string;
+          order_index: number;
+          title: string;
+          description: string;
+          thumbnail_url: string | null;
+          status: string;
+          is_accessible: boolean;
+          is_completed: boolean;
+          prerequisites_met: boolean;
+          next_level: string | null;
+        };
+        Insert: never;
+        Update: never;
+      };
     };
-    Functions: Record<string, never>;
-    Enums: Record<string, never>;
+    Functions: {
+      check_level_access: {
+        Args: {
+          p_user_id: string;
+          p_level_id: string;
+        };
+        Returns: boolean;
+      };
+      complete_level: {
+        Args: {
+          p_user_id: string;
+          p_level_id: string;
+          p_score?: number;
+        };
+        Returns: Json;
+      };
+      get_user_level_status: {
+        Args: {
+          p_user_id: string;
+        };
+        Returns: {
+          level_id: string;
+          order_index: number;
+          title: string;
+          description: string;
+          thumbnail_url: string | null;
+          status: string;
+          is_accessible: boolean;
+          is_completed: boolean;
+          prerequisites_met: boolean;
+          next_level: string | null;
+        }[];
+      };
+    };
+    Enums: {
+      progress_status: 'not_started' | 'in_progress' | 'completed';
+    };
   };
 }
