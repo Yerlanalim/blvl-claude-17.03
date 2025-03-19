@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
+import { checkSupabaseConnection } from '@/lib/supabase/check-connection';
 
 export default function SupabaseTest() {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
@@ -11,26 +12,55 @@ export default function SupabaseTest() {
   const supabase = createClient();
 
   useEffect(() => {
+    let isMounted = true;
+    const connectionTimeout = setTimeout(() => {
+      if (isMounted && isConnected === null) {
+        setIsConnected(false);
+        setError('Connection timeout. Supabase connection failed.');
+      }
+    }, 10000); // 10 second timeout
+
     async function testConnection() {
       try {
-        // Instead of querying a non-existent table, just test the connection
-        const { data, error } = await supabase.from('users').select('count()', { count: 'exact' });
+        // Use the simplified connection check
+        const result = await checkSupabaseConnection();
         
-        if (error) {
-          setError(error.message);
+        if (!isMounted) return;
+
+        if (!result.success) {
+          setError(result.error || 'Unknown error');
           setIsConnected(false);
           return;
         }
 
         setIsConnected(true);
         setError(null);
+        setSession(result.session);
 
-        // Check authentication status
-        const { data: sessionData } = await supabase.auth.getSession();
-        setSession(sessionData.session);
+        // Now that we know the connection works, try to query users table
+        // This is optional and just to show database connection status
+        try {
+          const { error: dbError } = await supabase
+            .from('users')
+            .select('*')
+            .limit(1);
+          
+          if (dbError && isMounted) {
+            console.warn('Database query failed:', dbError);
+            // Don't set isConnected to false, because the auth connection works
+            setError(prevError => prevError ? 
+              `${prevError}. Database warning: ${dbError.message}` : 
+              `Auth connected, but database query failed: ${dbError.message}`);
+          }
+        } catch (dbError) {
+          console.warn('Database query error:', dbError);
+        }
       } catch (error) {
-        setIsConnected(false);
-        setError(error instanceof Error ? error.message : 'Unknown error');
+        console.error('Unexpected connection error:', error);
+        if (isMounted) {
+          setIsConnected(false);
+          setError(error instanceof Error ? error.message : 'Unknown error');
+        }
       }
     }
 
@@ -40,10 +70,16 @@ export default function SupabaseTest() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+      if (isMounted) {
+        setSession(session);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      clearTimeout(connectionTimeout);
+      subscription.unsubscribe();
+    };
   }, [supabase]);
 
   const handleSignOut = async () => {
